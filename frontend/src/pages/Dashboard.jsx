@@ -14,16 +14,24 @@ const Dashboard = () => {
   useEffect(() => {
     const load = async () => {
       try {
-        if (!window.ethereum) return alert("Please install MetaMask.");
-        const provider = new BrowserProvider(window.ethereum);
-        const signer = await provider.getSigner();
-        const address = await signer.getAddress();
+        if (!window.ethereum) {
+          setWallet('');
+          return;
+        }
+
+        const accounts = await window.ethereum.request({ method: 'eth_accounts' });
+        if (!accounts || accounts.length === 0) {
+          setWallet('');
+          return;
+        }
+
+        const address = accounts[0];
         setWallet(address);
 
         const contract = await getContract();
 
-        const r = await contract.rentals(address);
-        const l = await contract.storageProviders(address);
+        const r = await contract.getMyRentals(address);
+        const l = await contract.getMyListings(address);
 
         setRentals(r);
         setListings(l);
@@ -58,7 +66,9 @@ const Dashboard = () => {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
         <div className="bg-gray-100 dark:bg-gray-800 p-4 rounded shadow">
           <p className="text-gray-600 dark:text-gray-300">👤 Wallet</p>
-          <p className="font-mono text-sm mt-1 text-indigo-500">{wallet}</p>
+          <p className="font-mono text-sm mt-1 text-indigo-500">
+            {wallet ? `${wallet.slice(0, 6)}...${wallet.slice(-4)}` : 'Not Connected'}
+          </p>
         </div>
 
         <div className="bg-gray-100 dark:bg-gray-800 p-4 rounded shadow">
@@ -89,7 +99,6 @@ const Dashboard = () => {
         </div>
       </div>
 
-      {/* Role-based quick links */}
       {role === 'renter' && (
         <Link to="/renter" className="inline-block mt-4 text-indigo-400 underline">
           ➡ Go to Renter Dashboard
@@ -99,6 +108,16 @@ const Dashboard = () => {
         <Link to="/provider" className="inline-block mt-4 text-indigo-400 underline">
           ➡ Go to Provider Dashboard
         </Link>
+      )}
+      {role === 'both' && (
+        <div className="mt-4 space-x-4">
+          <Link to="/provider" className="text-indigo-400 underline">
+            ➡ Provider Dashboard
+          </Link>
+          <Link to="/renter" className="text-indigo-400 underline">
+            ➡ Renter Dashboard
+          </Link>
+        </div>
       )}
     </div>
   );

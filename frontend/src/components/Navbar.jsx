@@ -1,5 +1,4 @@
 import React, { useEffect, useState } from 'react';
-import { BrowserProvider } from 'ethers';
 import { FaMoon, FaSun } from 'react-icons/fa';
 import { Link } from 'react-router-dom';
 
@@ -20,19 +19,40 @@ const Navbar = () => {
     }
   }, [darkMode]);
 
-  const connectWallet = async () => {
-    if (window.ethereum) {
-      try {
-        const provider = new BrowserProvider(window.ethereum);
-        const signer = await provider.getSigner();
-        const address = await signer.getAddress();
-        setWalletAddress(address);
-      } catch (err) {
-        console.error("Wallet connection error:", err);
+  // 👇 Check for existing wallet connection and react to account switch
+  useEffect(() => {
+    const detectWallet = async () => {
+      if (window.ethereum) {
+        const accounts = await window.ethereum.request({ method: 'eth_accounts' });
+        if (accounts.length > 0) setWalletAddress(accounts[0]);
       }
-    } else {
-      alert("Please install MetaMask.");
+    };
+
+    detectWallet();
+
+    window.ethereum?.on('accountsChanged', (accounts) => {
+      if (accounts.length > 0) {
+        setWalletAddress(accounts[0]);
+      } else {
+        setWalletAddress('');
+      }
+    });
+  }, []);
+
+  const connectWallet = async () => {
+    if (!window.ethereum) return alert("Please install MetaMask");
+    try {
+      const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+      if (accounts.length > 0) {
+        setWalletAddress(accounts[0]);
+      }
+    } catch (err) {
+      console.error("Wallet connect failed:", err);
     }
+  };
+
+  const disconnectWallet = () => {
+    setWalletAddress('');
   };
 
   return (
@@ -42,6 +62,13 @@ const Navbar = () => {
         <Link to="/" className="hover:text-indigo-400">Dashboard</Link>
         <Link to="/renter" className="hover:text-indigo-400">Renter</Link>
         <Link to="/provider" className="hover:text-indigo-400">Provider</Link>
+        <Link
+  to="/heliatest"
+  className="mr-4 hover:underline hover:text-blue-400 transition-colors"
+>
+  Peer Sync
+</Link>
+
       </div>
 
       <div className="flex items-center gap-4">
@@ -54,9 +81,17 @@ const Navbar = () => {
         </button>
 
         {walletAddress ? (
-          <span className="text-sm text-gray-700 dark:text-gray-300 bg-gray-200 dark:bg-gray-700 px-3 py-1 rounded">
-            {walletAddress.slice(0, 6)}...{walletAddress.slice(-4)}
-          </span>
+          <>
+            <span className="text-sm bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 px-3 py-1 rounded">
+              {walletAddress.slice(0, 6)}...{walletAddress.slice(-4)}
+            </span>
+            <button
+              onClick={disconnectWallet}
+              className="bg-red-500 hover:bg-red-400 px-3 py-1 text-sm rounded"
+            >
+              Disconnect
+            </button>
+          </>
         ) : (
           <button
             onClick={connectWallet}

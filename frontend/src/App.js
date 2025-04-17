@@ -4,6 +4,9 @@ import Navbar from './components/Navbar';
 import RenterView from './pages/RenterView';
 import ProviderView from './pages/ProviderView';
 import Dashboard from './pages/Dashboard';
+import HeliaTest from './components/HeliaTest';
+
+
 
 function App() {
   useEffect(() => {
@@ -24,6 +27,7 @@ function App() {
             <Route path="/" element={<Dashboard />} />
             <Route path="/renter" element={<RenterView />} />
             <Route path="/provider" element={<ProviderView />} />
+            <Route path="/heliatest" element={<HeliaTest />} /> {/* Peer Sync Test Route */}
           </Routes>
         </main>
       </Router>

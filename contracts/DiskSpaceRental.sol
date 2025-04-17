@@ -1,9 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.19;
+
 import "./ReentrancyGuard.sol";
-
-
-
 
 contract DiskSpaceRental is ReentrancyGuard {
     // --- EVENTS ---
@@ -63,22 +61,39 @@ contract DiskSpaceRental is ReentrancyGuard {
     }
 
     // --- STORAGE LISTING ---
-    function listStorage(uint256 _sizeInGB) external {
+    function listStorage(uint256 _pricePerDay, uint256 _sizeInGB) external {
         require(_sizeInGB > 0, "Size must be greater than zero");
-
-        uint256 dynamicPrice = basePricePerGB * (1 + storageProviders[msg.sender].length / 10);
+        require(_pricePerDay > 0, "Price must be greater than zero");
 
         storageProviders[msg.sender].push(Storage({
             provider: msg.sender,
-            pricePerDay: dynamicPrice,
+            pricePerDay: _pricePerDay,
             sizeInGB: _sizeInGB,
             isAvailable: true
         }));
 
-        emit StorageListed(msg.sender, dynamicPrice, _sizeInGB);
+        emit StorageListed(msg.sender, _pricePerDay, _sizeInGB);
     }
 
-    // --- RENT STORAGE ---
+    function unlistStorage(uint256 _storageId) external {
+        require(_storageId < storageProviders[msg.sender].length, "Invalid storage ID");
+
+        // Swap with last and remove
+        storageProviders[msg.sender][_storageId] = storageProviders[msg.sender][storageProviders[msg.sender].length - 1];
+        storageProviders[msg.sender].pop();
+
+        emit StorageUnlisted(msg.sender, _storageId);
+    }
+
+    function getMyListings(address _provider) external view returns (Storage[] memory) {
+        return storageProviders[_provider];
+    }
+
+    function getTotalListings(address _provider) external view returns (uint256) {
+        return storageProviders[_provider].length;
+    }
+
+    // --- RENTING ---
     function rentStorage(address _provider, uint256 _storageId, uint256 _rentalDays, string memory _cid) external payable nonReentrant {
         require(_storageId < storageProviders[_provider].length, "Invalid storage ID");
         Storage storage providerStorage = storageProviders[_provider][_storageId];
@@ -90,6 +105,7 @@ contract DiskSpaceRental is ReentrancyGuard {
         require(msg.value == totalCost, "Incorrect payment amount");
 
         uint256 rentalEndTime = block.timestamp + (_rentalDays * 1 days);
+
         rentals[msg.sender].push(Rental({
             provider: _provider,
             storageId: _storageId,
@@ -98,9 +114,14 @@ contract DiskSpaceRental is ReentrancyGuard {
             cid: _cid
         }));
 
+        providerStorage.isAvailable = false;
         providerBalances[_provider] += totalCost;
 
         emit StorageRented(msg.sender, _provider, _storageId, _rentalDays, rentalEndTime, _cid);
+    }
+
+    function getMyRentals(address _renter) external view returns (Rental[] memory) {
+        return rentals[_renter];
     }
 
     function getCID(address _renter, uint256 _index) public view returns (string memory) {
@@ -124,31 +145,6 @@ contract DiskSpaceRental is ReentrancyGuard {
         emit RentalEnded(msg.sender, _index, false);
     }
 
-    function withdrawFunds() external nonReentrant {
-        uint256 balance = providerBalances[msg.sender];
-        require(balance > 0, "No earnings available");
-
-        providerBalances[msg.sender] = 0;
-        payable(msg.sender).transfer(balance);
-
-        emit FundsWithdrawn(msg.sender, balance);
-    }
-
-    function unlistStorage(uint256 _storageId) external {
-        require(_storageId < storageProviders[msg.sender].length, "Invalid storage ID");
-        storageProviders[msg.sender][_storageId] = storageProviders[msg.sender][storageProviders[msg.sender].length - 1];
-        storageProviders[msg.sender].pop();
-
-        emit StorageUnlisted(msg.sender, _storageId);
-    }
-
-    function rateProvider(address _provider, uint8 _rating) external {
-        require(_rating >= 1 && _rating <= 5, "Rating must be between 1 and 5");
-        providerRatings[_provider] += _rating;
-        totalReviews[_provider]++;
-        emit ProviderRated(_provider, _rating);
-    }
-
     function requestRefund(uint256 _index) external nonReentrant {
         require(_index < rentals[msg.sender].length, "Invalid rental index");
         require(block.timestamp >= rentals[msg.sender][_index].endTime, "Rental period not over");
@@ -161,8 +157,23 @@ contract DiskSpaceRental is ReentrancyGuard {
 
         emit RefundIssued(msg.sender, _index, refundAmount);
     }
-    function getMyListings(address _provider) external view returns (Storage[] memory) {
-    return storageProviders[_provider];
-}
 
+    function withdrawFunds() external nonReentrant {
+        uint256 balance = providerBalances[msg.sender];
+        require(balance > 0, "No earnings available");
+
+        providerBalances[msg.sender] = 0;
+        payable(msg.sender).transfer(balance);
+
+        emit FundsWithdrawn(msg.sender, balance);
+    }
+
+    // --- RATING ---
+    function rateProvider(address _provider, uint8 _rating) external {
+        require(_rating >= 1 && _rating <= 5, "Rating must be between 1 and 5");
+
+        providerRatings[_provider] += _rating;
+        totalReviews[_provider]++;
+        emit ProviderRated(_provider, _rating);
+    }
 }

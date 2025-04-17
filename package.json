@@ -1,0 +1,11 @@
+{
+  "dependencies": {
+    "@chainsafe/libp2p-noise": "^16.1.2",
+    "@libp2p/circuit-relay-v2": "^3.2.10",
+    "@libp2p/identify": "^3.0.29",
+    "@libp2p/mplex": "^11.0.34",
+    "@libp2p/websockets": "^9.2.10",
+    "@multiformats/multiaddr": "^12.4.0",
+    "libp2p": "^2.8.4"
+  }
+}
