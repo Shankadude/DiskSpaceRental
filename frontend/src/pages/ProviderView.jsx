@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
+import { ethers } from 'ethers';
 import { getContract } from '../utils/getContract';
 import ProfileForm from '../components/ProfileForm';
-import { ethers } from 'ethers';
 
 const ProviderView = () => {
   const [rating, setRating] = useState('0.00');
@@ -20,7 +20,7 @@ const ProviderView = () => {
       const myListings = await cInstance.getMyListings(address);
       setListings(myListings);
     } catch (err) {
-      console.error('Fetching listings failed:', err);
+      console.error('❌ Fetching listings failed:', err);
       setListings([]);
     }
   }, []);
@@ -31,18 +31,15 @@ const ProviderView = () => {
         const c = await getContract();
         setContract(c);
         window.contract = c;
-        window.ethers = ethers;
-        console.log("✅ Contract exposed globally:", c.target);
 
         const provider = new ethers.BrowserProvider(window.ethereum);
         const signer = await provider.getSigner();
         const address = await signer.getAddress();
         const network = await provider.getNetwork();
 
-        console.log("🧠 Sanity Check:");
-        console.log("Signer Address:", address);
-        console.log("Network:", network.name, `(Chain ID: ${network.chainId})`);
-        console.log("Connected Contract:", c.target);
+        console.log("✅ Contract loaded:", c.target || c.address);
+        console.log("👤 Signer:", address);
+        console.log("🌐 Network:", network.name);
 
         await fetchListings(c);
 
@@ -54,7 +51,7 @@ const ProviderView = () => {
             : '0.00';
         setRating(avg);
       } catch (err) {
-        console.error('Initialization failed:', err);
+        console.error('❌ Contract loading failed:', err);
       }
     };
 
@@ -62,36 +59,41 @@ const ProviderView = () => {
   }, [fetchListings]);
 
   const listStorage = async () => {
-    const parsedSize = Number(sizeInGB);
-    let parsedPrice;
+    if (!contract) {
+      alert('Contract not ready.');
+      return;
+    }
 
+    let parsedPrice, parsedSize;
     try {
       parsedPrice = ethers.parseEther(pricePerDay);
-    } catch (err) {
-      alert("Invalid price input. Please enter a valid ETH value.");
+      parsedSize = ethers.toBigInt(sizeInGB);
+    } catch {
+      alert('Invalid input.');
       return;
     }
 
-    console.log("Parsed price (wei):", parsedPrice.toString());
-    console.log("Parsed size:", parsedSize);
-
-    if (parsedSize <= 0 || parsedPrice <= 0n) {
-      alert("Please enter valid non-zero size and price");
+    if (parsedPrice <= 0n || parsedSize <= 0n) {
+      alert('Please enter valid values.');
       return;
     }
+
+    console.log("📦 Listing Storage with:");
+    console.log("Price (wei):", parsedPrice.toString());
+    console.log("Size (GB):", parsedSize.toString());
 
     try {
       setLoading(true);
       const tx = await contract.listStorage(parsedPrice, parsedSize);
-      console.log("📤 Transaction sent:", tx.hash);
+      console.log("📤 TX Hash:", tx.hash);
       await tx.wait();
-      alert("✅ Storage listed successfully!");
+      alert("✅ Listed!");
       await fetchListings(contract);
       setSizeInGB('');
       setPricePerDay('');
     } catch (err) {
-      console.error("❌ Listing failed:", err);
-      alert("❌ Listing failed: " + (err.reason || err.message));
+      console.error("❌ listStorage failed:", err);
+      alert("❌ Failed: " + (err.reason || err.message));
     } finally {
       setLoading(false);
     }
@@ -102,10 +104,10 @@ const ProviderView = () => {
       setLoading(true);
       const tx = await contract.unlistStorage(index);
       await tx.wait();
-      alert('Unlisted!');
+      alert('✅ Unlisted!');
       await fetchListings(contract);
     } catch (err) {
-      console.error('Unlisting failed:', err);
+      console.error('❌ Unlisting failed:', err);
       alert('Failed to unlist.');
     } finally {
       setLoading(false);
@@ -117,9 +119,9 @@ const ProviderView = () => {
       setWithdrawing(true);
       const tx = await contract.withdrawFunds();
       await tx.wait();
-      alert('Funds withdrawn!');
+      alert('✅ Withdrawn!');
     } catch (err) {
-      console.error('Withdraw failed:', err);
+      console.error('❌ Withdraw failed:', err);
       alert('Failed to withdraw.');
     } finally {
       setWithdrawing(false);
@@ -129,7 +131,6 @@ const ProviderView = () => {
   return (
     <div>
       <ProfileForm />
-
       <p className="text-lg mt-2">
         ⭐ Average Rating: <span className="font-semibold">{rating}</span> / 5
       </p>

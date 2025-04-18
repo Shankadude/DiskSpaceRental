@@ -28852,12 +28852,12 @@
         }
       },
       "links": {},
-      "address": "0x8995bE5eB3306CFDFF2e71A4C784Dd9d5B486B36",
-      "transactionHash": "0x2d4280dce6516981cdf295d8f0dfabb13a79204b5c619f41ba9d7aa6e11c34b9"
+      "address": "0x83b4fAAbA2D13d553961667271E0A75E4173A478",
+      "transactionHash": "0x809e3f3b4e1eebd9f0020c8023968b52e1a192b50208ec0e8bc91c36a6f5b0f7"
     }
   },
   "schemaVersion": "3.4.16",
-  "updatedAt": "2025-04-17T04:49:39.487Z",
+  "updatedAt": "2025-04-18T09:09:08.272Z",
   "networkType": "ethereum",
   "devdoc": {
     "kind": "dev",

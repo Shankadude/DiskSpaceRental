@@ -4,82 +4,48 @@ import { ethers } from 'ethers';
 
 const RenterRentals = () => {
   const [rentals, setRentals] = useState([]);
-  const [contract, setContract] = useState(null);
-  const [cidInputs, setCidInputs] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    const load = async () => {
-      const c = await getContract();
-      setContract(c);
-
+  const load = async () => {
+    try {
       const provider = new ethers.BrowserProvider(window.ethereum);
       const signer = await provider.getSigner();
       const address = await signer.getAddress();
+      const contract = await getContract();
 
-      try {
-        const result = await c.rentals(address); // ✅ access public mapping
-        setRentals(result);
-        setCidInputs(result.map(r => r.cid));
-      } catch (err) {
-        console.error("Error fetching rentals:", err);
-      }
-    };
+      const result = await contract.getMyRentals(address);
+      setRentals(result);
+    } catch (err) {
+      console.error('Error fetching rentals:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
 
+  useEffect(() => {
     load();
   }, []);
 
-  const updateCID = async (index) => {
-    if (!cidInputs[index]) return;
-    try {
-      await contract.updateCID(index, cidInputs[index]);
-      alert('CID updated!');
-    } catch (err) {
-      console.error("CID update failed:", err);
-    }
-  };
-
-  const requestRefund = async (index) => {
-    try {
-      await contract.requestRefund(index);
-      alert('Refund requested!');
-    } catch (err) {
-      console.error("Refund failed:", err);
-    }
-  };
-
   return (
-    <div className="mt-10">
-      <h2 className="text-xl font-bold mb-4">My Active Rentals</h2>
-      {rentals.length === 0 && <p>No rentals found.</p>}
-      <div className="grid gap-4">
-        {rentals.map((r, i) => (
-          <div key={i} className="p-4 bg-gray-700 rounded shadow">
-            <p><strong>Provider:</strong> {r.provider}</p>
-            <p><strong>Storage ID:</strong> {Number(r.storageId)}</p>
-            <p><strong>End Time:</strong> {new Date(Number(r.endTime) * 1000).toLocaleString()}</p>
-            <p><strong>Current CID:</strong> {r.cid}</p>
-
-            <div className="mt-2 flex items-center gap-2">
-              <input
-                type="text"
-                value={cidInputs[i]}
-                onChange={(e) => {
-                  const updated = [...cidInputs];
-                  updated[i] = e.target.value;
-                  setCidInputs(updated);
-                }}
-                className="p-1 text-black rounded"
-              />
-              <button onClick={() => updateCID(i)} className="bg-blue-500 text-white px-2 py-1 rounded">
-                Update CID
-              </button>
-              <button onClick={() => requestRefund(i)} className="bg-red-500 text-white px-2 py-1 rounded">
-                Refund
-              </button>
-            </div>
-          </div>
-        ))}
-      </div>
+    <div className="p-4">
+      <h2 className="text-2xl font-bold mb-4">My Rentals</h2>
+      {loading ? (
+        <p>Loading...</p>
+      ) : rentals.length === 0 ? (
+        <p>No active rentals found.</p>
+      ) : (
+        <ul className="space-y-3">
+          {rentals.map((r, i) => (
+            <li key={i} className="bg-gray-800 p-3 rounded shadow text-sm">
+              <div><strong>Provider:</strong> {r.provider}</div>
+              <div><strong>Storage ID:</strong> {r.storageId}</div>
+              <div><strong>End Time:</strong> {new Date(Number(r.endTime) * 1000).toLocaleString()}</div>
+              <div><strong>Escrow:</strong> {Number(r.escrowAmount) / 1e18} ETH</div>
+              <div><strong>CID:</strong> {r.cid || 'Not set yet'}</div>
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 };

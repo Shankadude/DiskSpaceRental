@@ -1,34 +1,44 @@
 import React, { useState } from 'react';
-import { API_BASE } from '../utils/api';
-import axios from 'axios';
+import { createHelia } from 'helia';
+import { unixfs } from '@helia/unixfs';
+import { CID } from 'multiformats/cid';
 
 const FileUploader = ({ onUpload }) => {
-  const [status, setStatus] = useState('');
+  const [cid, setCid] = useState('');
+  const [uploading, setUploading] = useState(false);
 
-  const handleChange = async (e) => {
+  const handleFileChange = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
-    setStatus('Uploading...');
+
+    setUploading(true);
     try {
-      const formData = new FormData();
-      formData.append('file', file);
+      const helia = await createHelia();
+      const fs = unixfs(helia);
 
-      const res = await axios.post(`${API_BASE}/upload-file`, formData, {
-        headers: { 'Content-Type': 'multipart/form-data' }
-      });
+      const fileContent = await file.arrayBuffer();
+      const cidResult = await fs.addBytes(new Uint8Array(fileContent));
 
-      setStatus('Upload complete!');
-      onUpload(res.data); // { cid, url }
+      const cidStr = cidResult.toString();
+      setCid(cidStr);
+      onUpload(cidStr);
     } catch (err) {
-      console.error(err);
-      setStatus('Upload failed');
+      console.error('Upload failed:', err);
+      alert('Failed to upload file to IPFS');
+    } finally {
+      setUploading(false);
     }
   };
 
   return (
-    <div>
-      <input type="file" onChange={handleChange} />
-      <p>{status}</p>
+    <div className="mb-4">
+      <input type="file" onChange={handleFileChange} />
+      {uploading && <p>Uploading...</p>}
+      {cid && (
+        <div className="mt-2 text-green-400">
+          ✅ CID: <code>{cid}</code>
+        </div>
+      )}
     </div>
   );
 };
