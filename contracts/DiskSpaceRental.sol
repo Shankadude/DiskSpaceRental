@@ -33,7 +33,7 @@ contract DiskSpaceRental is ReentrancyGuard {
     }
 
     struct EncryptedProfile {
-        string encryptedData; // Encrypted JSON (displayName, avatarCID, bio)
+        string encryptedData;
     }
 
     // --- STATE ---
@@ -44,6 +44,7 @@ contract DiskSpaceRental is ReentrancyGuard {
     mapping(address => uint256) public totalReviews;
     mapping(address => EncryptedProfile) private profiles;
 
+    address[] public allProviders;
     uint256 public basePricePerGB = 0.01 ether;
 
     constructor() {
@@ -65,6 +66,10 @@ contract DiskSpaceRental is ReentrancyGuard {
         require(_sizeInGB > 0, "Size must be greater than zero");
         require(_pricePerDay > 0, "Price must be greater than zero");
 
+        if (storageProviders[msg.sender].length == 0) {
+            allProviders.push(msg.sender);
+        }
+
         storageProviders[msg.sender].push(Storage({
             provider: msg.sender,
             pricePerDay: _pricePerDay,
@@ -75,13 +80,50 @@ contract DiskSpaceRental is ReentrancyGuard {
         emit StorageListed(msg.sender, _pricePerDay, _sizeInGB);
     }
 
+    function getAllAvailableStorage()
+        external
+        view
+        returns (
+            address[] memory providers,
+            uint256[] memory storageIds,
+            uint256[] memory prices,
+            uint256[] memory sizes
+        )
+    {
+        uint256 count;
+
+        for (uint256 i = 0; i < allProviders.length; i++) {
+            Storage[] memory listings = storageProviders[allProviders[i]];
+            for (uint256 j = 0; j < listings.length; j++) {
+                if (listings[j].isAvailable) count++;
+            }
+        }
+
+        providers = new address[](count);
+        storageIds = new uint256[](count);
+        prices = new uint256[](count);
+        sizes = new uint256[](count);
+
+        uint256 index;
+        for (uint256 i = 0; i < allProviders.length; i++) {
+            address provider = allProviders[i];
+            Storage[] memory listings = storageProviders[provider];
+            for (uint256 j = 0; j < listings.length; j++) {
+                if (listings[j].isAvailable) {
+                    providers[index] = provider;
+                    storageIds[index] = j;
+                    prices[index] = listings[j].pricePerDay;
+                    sizes[index] = listings[j].sizeInGB;
+                    index++;
+                }
+            }
+        }
+    }
+
     function unlistStorage(uint256 _storageId) external {
         require(_storageId < storageProviders[msg.sender].length, "Invalid storage ID");
-
-        // Swap with last and remove
         storageProviders[msg.sender][_storageId] = storageProviders[msg.sender][storageProviders[msg.sender].length - 1];
         storageProviders[msg.sender].pop();
-
         emit StorageUnlisted(msg.sender, _storageId);
     }
 
@@ -138,10 +180,8 @@ contract DiskSpaceRental is ReentrancyGuard {
     function endRental(uint256 _index) external nonReentrant {
         require(_index < rentals[msg.sender].length, "Invalid rental index");
         require(block.timestamp >= rentals[msg.sender][_index].endTime, "Rental period not over");
-
         rentals[msg.sender][_index] = rentals[msg.sender][rentals[msg.sender].length - 1];
         rentals[msg.sender].pop();
-
         emit RentalEnded(msg.sender, _index, false);
     }
 
@@ -150,28 +190,23 @@ contract DiskSpaceRental is ReentrancyGuard {
         require(block.timestamp >= rentals[msg.sender][_index].endTime, "Rental period not over");
 
         uint256 refundAmount = rentals[msg.sender][_index].escrowAmount;
-
         rentals[msg.sender][_index] = rentals[msg.sender][rentals[msg.sender].length - 1];
         rentals[msg.sender].pop();
         payable(msg.sender).transfer(refundAmount);
-
         emit RefundIssued(msg.sender, _index, refundAmount);
     }
 
     function withdrawFunds() external nonReentrant {
         uint256 balance = providerBalances[msg.sender];
         require(balance > 0, "No earnings available");
-
         providerBalances[msg.sender] = 0;
         payable(msg.sender).transfer(balance);
-
         emit FundsWithdrawn(msg.sender, balance);
     }
 
     // --- RATING ---
     function rateProvider(address _provider, uint8 _rating) external {
         require(_rating >= 1 && _rating <= 5, "Rating must be between 1 and 5");
-
         providerRatings[_provider] += _rating;
         totalReviews[_provider]++;
         emit ProviderRated(_provider, _rating);

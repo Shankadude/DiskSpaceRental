@@ -123,5 +123,17 @@
     "outputs": [{ "internalType": "uint256", "name": "", "type": "uint256" }],
     "stateMutability": "view",
     "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "getAllAvailableStorage",
+    "outputs": [
+      { "internalType": "address[]", "name": "providers", "type": "address[]" },
+      { "internalType": "uint256[]", "name": "storageIds", "type": "uint256[]" },
+      { "internalType": "uint256[]", "name": "prices", "type": "uint256[]" },
+      { "internalType": "uint256[]", "name": "sizes", "type": "uint256[]" }
+    ],
+    "stateMutability": "view",
+    "type": "function"
   }
 ]

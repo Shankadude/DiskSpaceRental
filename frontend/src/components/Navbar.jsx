@@ -19,7 +19,7 @@ const Navbar = () => {
     }
   }, [darkMode]);
 
-  // 👇 Check for existing wallet connection and react to account switch
+  // Detect wallet and handle account switch
   useEffect(() => {
     const detectWallet = async () => {
       if (window.ethereum) {
@@ -41,13 +41,19 @@ const Navbar = () => {
 
   const connectWallet = async () => {
     if (!window.ethereum) return alert("Please install MetaMask");
+
     try {
-      const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
-      if (accounts.length > 0) {
-        setWalletAddress(accounts[0]);
+      const current = await window.ethereum.request({ method: 'eth_accounts' });
+      if (current.length > 0) {
+        setWalletAddress(current[0]);
+        return;
       }
+
+      const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+      if (accounts.length > 0) setWalletAddress(accounts[0]);
     } catch (err) {
       console.error("Wallet connect failed:", err);
+      alert(err.message);
     }
   };
 
@@ -63,12 +69,11 @@ const Navbar = () => {
         <Link to="/renter" className="hover:text-indigo-400">Renter</Link>
         <Link to="/provider" className="hover:text-indigo-400">Provider</Link>
         <Link
-  to="/heliatest"
-  className="mr-4 hover:underline hover:text-blue-400 transition-colors"
->
-  Peer Sync
-</Link>
-
+          to="/heliatest"
+          className="mr-4 hover:underline hover:text-blue-400 transition-colors"
+        >
+          Peer Sync
+        </Link>
       </div>
 
       <div className="flex items-center gap-4">

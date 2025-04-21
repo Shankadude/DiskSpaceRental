@@ -5,8 +5,8 @@ import RenterView from './pages/RenterView';
 import ProviderView from './pages/ProviderView';
 import Dashboard from './pages/Dashboard';
 import HeliaTest from './components/HeliaTest';
-
-
+import { Buffer } from 'buffer';
+window.Buffer = Buffer;
 
 function App() {
   useEffect(() => {

@@ -1,9 +1,28 @@
 import React, { useEffect, useState } from 'react';
 import { getContract } from '../utils/getContract';
 import { ethers } from 'ethers';
+import { decryptCID } from '../utils/encryption';
+import { createHelia } from 'helia';
+import { unixfs } from '@helia/unixfs';
+
+const RoleSelector = ({ currentRole, onChange }) => {
+  return (
+    <div className="mb-4">
+      <label className="mr-2 font-medium">Select Role:</label>
+      <select
+        value={currentRole}
+        onChange={(e) => onChange(e.target.value)}
+        className="px-3 py-1 rounded border dark:bg-gray-700 dark:text-white"
+      >
+        <option value="Provider">Provider</option>
+        <option value="Renter">Renter</option>
+      </select>
+    </div>
+  );
+};
 
 const Dashboard = () => {
-  const [role, setRole] = useState(null);
+  const [role, setRole] = useState(() => localStorage.getItem('userRole') || null);
   const [rentals, setRentals] = useState([]);
   const [balance, setBalance] = useState('');
   const [loading, setLoading] = useState(true);
@@ -15,18 +34,24 @@ const Dashboard = () => {
       const address = await signer.getAddress();
       const contract = await getContract();
 
-      // Basic Role Logic
       const myListings = await contract.getMyListings(address);
+      if (!localStorage.getItem('userRole')) {
+        if (myListings.length > 0) {
+          setRole('Provider');
+          localStorage.setItem('userRole', 'Provider');
+        } else {
+          setRole('Renter');
+          localStorage.setItem('userRole', 'Renter');
+        }
+      }
+
       if (myListings.length > 0) {
-        setRole('Provider');
         const b = await contract.providerBalances(address);
         setBalance(ethers.formatEther(b));
       } else {
-        setRole('Renter');
         const r = await contract.getMyRentals(address);
         setRentals(r);
       }
-
     } catch (err) {
       console.error('Dashboard load error:', err);
     } finally {
@@ -38,11 +63,42 @@ const Dashboard = () => {
     load();
   }, []);
 
+  const handleRoleChange = (newRole) => {
+    setRole(newRole);
+    localStorage.setItem('userRole', newRole);
+  };
+
+  const downloadFile = async (encryptedCid) => {
+    try {
+      const cid = await decryptCID(encryptedCid);
+      const helia = await createHelia();
+      const fs = unixfs(helia);
+
+      const stream = fs.cat(cid);
+      const chunks = [];
+      for await (const chunk of stream) {
+        chunks.push(chunk);
+      }
+
+      const blob = new Blob(chunks);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${cid}.bin`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      alert("Failed to download file: " + err.message);
+    }
+  };
+
   if (loading) return <p>Loading Dashboard...</p>;
 
   return (
     <div className="p-4">
-      <h2 className="text-2xl font-bold mb-4">Dashboard</h2>
+      <h2 className="text-2xl font-bold mb-2">Dashboard</h2>
+      <RoleSelector currentRole={role} onChange={handleRoleChange} />
+
       {role === 'Provider' ? (
         <>
           <p className="mb-2">👤 Role: <strong>Provider</strong></p>
@@ -58,7 +114,21 @@ const Dashboard = () => {
                 <div><strong>Provider:</strong> {r.provider}</div>
                 <div><strong>Storage ID:</strong> {r.storageId}</div>
                 <div><strong>Ends:</strong> {new Date(Number(r.endTime) * 1000).toLocaleString()}</div>
-                <div><strong>CID:</strong> {r.cid || 'Not Uploaded'}</div>
+                <div>
+                  <strong>CID:</strong> {r.cid ? (
+                    <>
+                      <span className="text-green-400">Encrypted</span>
+                      <button
+                        onClick={() => downloadFile(r.cid)}
+                        className="ml-4 bg-blue-600 text-white px-2 py-1 rounded text-xs"
+                      >
+                        Download File
+                      </button>
+                    </>
+                  ) : (
+                    <span className="text-yellow-300">Not Uploaded</span>
+                  )}
+                </div>
               </li>
             ))}
           </ul>

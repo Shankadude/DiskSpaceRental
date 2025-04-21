@@ -1,139 +1,110 @@
-import React, { useEffect, useState, useCallback } from 'react';
-import { ethers } from 'ethers';
-import { getContract } from '../utils/getContract';
-import ProfileForm from '../components/ProfileForm';
+import React, { useEffect, useState, useCallback } from 'react'
+import { ethers } from 'ethers'
+import { getContract } from '../utils/getContract'
+import ProfileForm from '../components/ProfileForm'
+import FileDownloader from '../components/FileDownloader'
 
 const ProviderView = () => {
-  const [rating, setRating] = useState('0.00');
-  const [contract, setContract] = useState(null);
-  const [sizeInGB, setSizeInGB] = useState('');
-  const [pricePerDay, setPricePerDay] = useState('');
-  const [listings, setListings] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [withdrawing, setWithdrawing] = useState(false);
+  const [rating, setRating] = useState('0.00')
+  const [contract, setContract] = useState(null)
+  const [sizeInGB, setSizeInGB] = useState('')
+  const [pricePerDay, setPricePerDay] = useState('')
+  const [listings, setListings] = useState([])
+  const [loading, setLoading] = useState(false)
+  const [withdrawing, setWithdrawing] = useState(false)
 
   const fetchListings = useCallback(async (cInstance) => {
-    try {
-      const provider = new ethers.BrowserProvider(window.ethereum);
-      const signer = await provider.getSigner();
-      const address = await signer.getAddress();
-      const myListings = await cInstance.getMyListings(address);
-      setListings(myListings);
-    } catch (err) {
-      console.error('❌ Fetching listings failed:', err);
-      setListings([]);
-    }
-  }, []);
+    const provider = new ethers.BrowserProvider(window.ethereum)
+    const signer = await provider.getSigner()
+    const address = await signer.getAddress()
+    const myListings = await cInstance.getMyListings(address)
+    setListings(myListings)
+  }, [])
 
   useEffect(() => {
     const load = async () => {
       try {
-        const c = await getContract();
-        setContract(c);
-        window.contract = c;
+        const c = await getContract()
+        setContract(c)
 
-        const provider = new ethers.BrowserProvider(window.ethereum);
-        const signer = await provider.getSigner();
-        const address = await signer.getAddress();
-        const network = await provider.getNetwork();
+        const provider = new ethers.BrowserProvider(window.ethereum)
+        const signer = await provider.getSigner()
+        const address = await signer.getAddress()
 
-        console.log("✅ Contract loaded:", c.target || c.address);
-        console.log("👤 Signer:", address);
-        console.log("🌐 Network:", network.name);
+        await fetchListings(c)
 
-        await fetchListings(c);
-
-        const ratingSum = await c.providerRatings(address);
-        const totalReviews = await c.totalReviews(address);
-        const avg =
-          totalReviews > 0
-            ? (Number(ratingSum) / Number(totalReviews)).toFixed(2)
-            : '0.00';
-        setRating(avg);
+        const ratingSum = await c.providerRatings(address)
+        const totalReviews = await c.totalReviews(address)
+        const avg = totalReviews > 0 ? (Number(ratingSum) / Number(totalReviews)).toFixed(2) : '0.00'
+        setRating(avg)
       } catch (err) {
-        console.error('❌ Contract loading failed:', err);
+        console.error('❌ Contract loading failed:', err)
       }
-    };
+    }
 
-    load();
-  }, [fetchListings]);
+    load()
+  }, [fetchListings])
 
   const listStorage = async () => {
-    if (!contract) {
-      alert('Contract not ready.');
-      return;
-    }
+    if (!contract) return alert("Contract not ready.")
 
-    let parsedPrice, parsedSize;
+    let parsedPrice, parsedSize
     try {
-      parsedPrice = ethers.parseEther(pricePerDay);
-      parsedSize = ethers.toBigInt(sizeInGB);
+      parsedPrice = ethers.parseEther(pricePerDay)
+      parsedSize = ethers.toBigInt(sizeInGB)
     } catch {
-      alert('Invalid input.');
-      return;
+      return alert('Invalid input.')
     }
 
-    if (parsedPrice <= 0n || parsedSize <= 0n) {
-      alert('Please enter valid values.');
-      return;
-    }
-
-    console.log("📦 Listing Storage with:");
-    console.log("Price (wei):", parsedPrice.toString());
-    console.log("Size (GB):", parsedSize.toString());
+    if (parsedPrice <= 0n || parsedSize <= 0n) return alert('Please enter valid values.')
 
     try {
-      setLoading(true);
-      const tx = await contract.listStorage(parsedPrice, parsedSize);
-      console.log("📤 TX Hash:", tx.hash);
-      await tx.wait();
-      alert("✅ Listed!");
-      await fetchListings(contract);
-      setSizeInGB('');
-      setPricePerDay('');
+      setLoading(true)
+      const tx = await contract.listStorage(parsedPrice, parsedSize)
+      await tx.wait()
+      alert("✅ Listed!")
+      await fetchListings(contract)
+      setSizeInGB('')
+      setPricePerDay('')
     } catch (err) {
-      console.error("❌ listStorage failed:", err);
-      alert("❌ Failed: " + (err.reason || err.message));
+      console.error("❌ listStorage failed:", err)
+      alert("❌ Failed: " + (err.reason || err.message))
     } finally {
-      setLoading(false);
+      setLoading(false)
     }
-  };
+  }
 
   const handleUnlist = async (index) => {
     try {
-      setLoading(true);
-      const tx = await contract.unlistStorage(index);
-      await tx.wait();
-      alert('✅ Unlisted!');
-      await fetchListings(contract);
+      setLoading(true)
+      const tx = await contract.unlistStorage(index)
+      await tx.wait()
+      alert('✅ Unlisted!')
+      await fetchListings(contract)
     } catch (err) {
-      console.error('❌ Unlisting failed:', err);
-      alert('Failed to unlist.');
+      alert('Failed to unlist.')
     } finally {
-      setLoading(false);
+      setLoading(false)
     }
-  };
+  }
 
   const handleWithdraw = async () => {
     try {
-      setWithdrawing(true);
-      const tx = await contract.withdrawFunds();
-      await tx.wait();
-      alert('✅ Withdrawn!');
+      setWithdrawing(true)
+      const tx = await contract.withdrawFunds()
+      await tx.wait()
+      alert('✅ Withdrawn!')
     } catch (err) {
-      console.error('❌ Withdraw failed:', err);
-      alert('Failed to withdraw.');
+      alert('Failed to withdraw.')
     } finally {
-      setWithdrawing(false);
+      setWithdrawing(false)
     }
-  };
+  }
 
   return (
     <div>
       <ProfileForm />
-      <p className="text-lg mt-2">
-        ⭐ Average Rating: <span className="font-semibold">{rating}</span> / 5
-      </p>
+      <p className="text-lg mt-2">⭐ Average Rating: <span className="font-semibold">{rating}</span> / 5</p>
 
       <h2 className="text-2xl font-bold mb-4">List Your Storage</h2>
       <div className="flex gap-2 mb-4">
@@ -151,11 +122,7 @@ const ProviderView = () => {
           placeholder="Price per day in ETH"
           className="p-2 text-black rounded"
         />
-        <button
-          onClick={listStorage}
-          className="bg-green-600 text-white px-4 py-2 rounded"
-          disabled={loading}
-        >
+        <button onClick={listStorage} className="bg-green-600 text-white px-4 py-2 rounded" disabled={loading}>
           {loading ? 'Listing...' : 'List'}
         </button>
       </div>
@@ -163,28 +130,23 @@ const ProviderView = () => {
       <h3 className="text-xl font-semibold mb-2">Your Listings</h3>
       <ul className="space-y-2">
         {listings.map((s, i) => (
-          <li
-            key={i}
-            className="bg-gray-700 p-3 rounded shadow text-sm flex justify-between items-center"
-          >
-            <div>
-              <strong>Price/Day:</strong> {Number(s.pricePerDay) / 1e18} ETH |{' '}
-              <strong>Size:</strong> {s.sizeInGB} GB |{' '}
-              <strong>Status:</strong>{' '}
-              {s.isAvailable ? (
-                <span className="text-green-400">Available</span>
-              ) : (
-                <span className="text-red-400">Rented</span>
+          <li key={i} className="bg-gray-700 p-3 rounded shadow text-sm flex flex-col">
+            <div className="flex justify-between items-center">
+              <div>
+                <strong>Price/Day:</strong> {Number(s.pricePerDay) / 1e18} ETH | <strong>Size:</strong> {s.sizeInGB} GB |{' '}
+                <strong>Status:</strong>{' '}
+                {s.isAvailable ? <span className="text-green-400">Available</span> : <span className="text-red-400">Rented</span>}
+              </div>
+              {s.isAvailable && (
+                <button onClick={() => handleUnlist(i)} className="bg-red-600 text-white px-3 py-1 rounded ml-4" disabled={loading}>
+                  {loading ? 'Processing...' : 'Unlist'}
+                </button>
               )}
             </div>
-            {s.isAvailable && (
-              <button
-                onClick={() => handleUnlist(i)}
-                className="bg-red-600 text-white px-3 py-1 rounded ml-4"
-                disabled={loading}
-              >
-                {loading ? 'Processing...' : 'Unlist'}
-              </button>
+            {!s.isAvailable && (
+              <div className="mt-2">
+                <FileDownloader storageId={s.storageId} />
+              </div>
             )}
           </li>
         ))}
@@ -201,7 +163,7 @@ const ProviderView = () => {
         </button>
       </div>
     </div>
-  );
-};
+  )
+}
 
-export default ProviderView;
+export default ProviderView
